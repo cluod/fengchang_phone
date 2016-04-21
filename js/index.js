@@ -1,5 +1,6 @@
 $(function() {
-	W.define('text', ['maps'], function(maps) {
+	var url = location.protocol+'//'+location.host+location.pathname;
+	W.require.bind(null, ['maps'], function(maps) {
 		var LNGLAT_PROVINCE = {
 			"新疆": [87.606117, 43.790939],
 			"西藏": [91.13205, 29.657589],
@@ -36,9 +37,7 @@ $(function() {
 			"香港": [114.154404, 22.280685],
 			"澳门": [113.550056, 22.200796]
 		};
-		var lon, lat;
 		var markers = [];
-
 		function addProvinceName(level) {
 			var tmp;
 			while ((tmp = markers.shift())) {
@@ -55,13 +54,34 @@ $(function() {
 				}).addTo(maps);
 				markers.push(marker);
 			}
-
-			function onMapClick(e) {
-
+		}
+		addProvinceName();
+		var marker_star = new L.Marker({
+			icon: L.icon({
+    			iconUrl: 'js/images/marker-icon-2x.png',
+    		})
+		});
+		maps.on('zoomend', function(e) {
+			addProvinceName();
+		});
+		var canload = true;
+		function onMapClick(e) {
+			var lon, lat, city, dirdes, message_detail_two_right_str, leval, wind_leval = null;
+			if (canload) {
+				canload = false;
+				$(".message").removeClass('message_show');
+				$(".loading_pic_container").addClass('message_show');
+				marker_star && maps.removeLayer(marker_star);
+				marker_star = L.marker(e.latlng, {
+					icon: L.icon({
+		    			iconUrl: 'http://www.welife100.com/fengc/js/images/marker-icon-2x.png',
+		    			iconSize: [24, 30],
+		    		})
+				}).addTo(maps);
 				lon = e.latlng.lng.toString(); //经度转换成字符串
 				lat = e.latlng.lat.toString(); //纬度转换成字符串
 				$.ajax({
-					url: "agent.php",
+					url: "agent.html",
 					type: 'get',
 					data: {
 						"type": 1,
@@ -70,199 +90,92 @@ $(function() {
 					},
 					dataType: 'json',
 					success: function(data) {
+						canload = true;
 						var desc = data.discript;
 						var de_a = desc[1];
 						var de_b = desc[2];
 						var de_c = desc[3];
-						var dirdes = data.forecast[0].dirdes; //风向
-						var speed = data.forecast[0].speed + "m/s"; //风速
+						leval = data.forecast[0].windlevel;
+						if (leval == 1) {
+							wind_leval = "0-3级";
+						}else if(leval == 2){
+							wind_leval = "4-5级";
+						}else if(leval == 3){
+							wind_leval = "6级以上";
+						}
+						dirdes = data.forecast[0].dirdes; //风向
+						var speed_string = data.forecast[0].speed.toString().substring(0, 3);
+						var speed = speed_string + "m/s"; //风速
 						var message_detail_two_left_str = speed + de_a + '<br/>' + dirdes;
 						var air = ''; //空气质量
-						var colorArr =["#30c637","#ffff00","#ff7e00","#ff0000","#7f007f","#7e0000"];
-						var colorindex="";
-						var fontcolor="";
-						var message_detail_two_right_str = "";
+						var colorArr = ["#30c637", "#ffff00", "#ff7e00", "#ff0000", "#7f007f", "#7e0000"];
+						var colorindex = "";
+						var fontcolor = "";
+						if (data.forecast15day != undefined) {
+							city = data.forecast15day.c.c5;
+						} else {
+							city = "未知城市";
+						}
 						if (data.air != undefined) {
 							air = data.air.k.k3.split("|")[0];
+						}else{
+							air = '';
+							message_detail_two_right_str = '';
 						}
-						if (air>0 && air < 50) {
+						if (air > 0 && air < 50) {
 							colorindex = colorArr[0];
-							message_detail_two_right_str = air +"优";
+							message_detail_two_right_str = air + "优";
 						} else if (51 < air && air < 100) {
 							colorindex = colorArr[1];
-                            fontcolor = "black";
+							fontcolor = "black";
 							message_detail_two_right_str = air + "良";
-						}else if (101 < air && air < 150) {
+						} else if (101 < air && air < 150) {
 							colorindex = colorArr[2];
 							message_detail_two_right_str = air + "轻度污染";
-						}else if (151 < air && air < 200) {
+						} else if (151 < air && air < 200) {
 							colorindex = colorArr[3];
-							message_detail_two_right_str = air +"中度污染";
-						}else if (201 < air && air < 300) {
+							message_detail_two_right_str = air + "中度污染";
+						} else if (201 < air && air < 300) {
 							colorindex = colorArr[4];
 							message_detail_two_right_str = air + "重度污染";
-						}else if ( air > 300) {
+						} else if (air > 300) {
 							colorindex = colorArr[5];
-							message_detail_two_right_str = air +"严重污染";
+							message_detail_two_right_str = air + "严重污染";
 						}
-                         $(".message-detail-two-right").css({
-                         	"background":colorindex,
-                         	"color" :  fontcolor
-                         });
-						$(".message-detail-two-right").html(message_detail_two_right_str);
-						message = de_b + ',' + de_c;
+						var _left = $(".message-detail-two-left");
+						var _right = $(".message-detail-two-right");
+						_right.css({
+							"background": colorindex,
+							"color": fontcolor
+						});
+						$(".loading_pic_container").removeClass('message_show');
 						$(".message").addClass('message_show');
+						message = city +':'+ de_b + ',' + de_c;
 						$(".message-detail-one").html(message);
-						$(".message-detail-two-left").html(message_detail_two_left_str);
-
+						_left.html(message_detail_two_left_str);
+						_right.html(message_detail_two_right_str);
+						_right.css({
+							"background": colorindex,
+							"color": fontcolor
+						});
 						$(".confirm_btn").click(function() {
 							$(".message-detail-one").html("");
-							$(".message-detail-two-left").html("");
+							_left.html("");
 							$(".message").removeClass('message_show');
 						})
 
+						var desc = '';
+						if (message_detail_two_right_str) {
+							desc = '这里是'+city+"，当前为"+dirdes+wind_leval+'，空气质量'+message_detail_two_right_str;
+						}else{
+							desc = '这里是'+city+"，当前为"+dirdes+wind_leval;
+						}
+						_share(url, "蓝PI风神送你最新的空气质量预报！", desc, 'http://www.welife100.com/fengc/img/icon200.jpg');
 					}
 				})
 			}
-			maps.on('click', onMapClick);
 		}
-		addProvinceName();
-		maps.on('zoomend', function(e) {
-			addProvinceName();
-		});
-	});
-	var _getCanvasWind = (function() {
-		var $canvasWind;
-		return function() {
-			if (!$canvasWind || $canvasWind.length == 0) {
-				$canvasWind = $('.leaflet-canvas1, .leaflet-canvas2, .leaflet-canvas3');
-			}
-			return $canvasWind;
-		}
+		maps.on('click', onMapClick);
 	})();
-	var Wind = {
-		show: function() {
-			_getCanvasWind().show();
-		},
-		hide: function() {
-			_getCanvasWind().hide();
-		}
-	}
-	var CONF_LEGENDNAME = {
-		wind: './img/legend_wind.png',
-		radar: './img/legend_radar.png',
-		typhoon: './img/legend_typhoon.png'
-	};
-	var title_url_pre = './img/title_';
-	var CONF_TITLE = {
-		wind: title_url_pre + 'wind.png',
-		radar: title_url_pre + 'radar.png',
-		cloud: title_url_pre + 'cloud.png',
-		typhoon: ''
-	}
-	var $box_title_container = $('.box_title_container');
-	var $legend = $('.legend');
-	// 清除所有操作
-	$('.tool_btn_pro').click(function() {
-		Wind.hide();
-		Typhoon.clear();
-		Imgs.remove();
-		Paint.clear();
-		$('.load_progress_wrap').hide();
-		$(this).addClass('on').siblings().removeClass('on');
-
-		var name = $(this).data('name');
-		var title_img = CONF_TITLE[name];
-		if (title_img) {
-			$box_title_container.show();
-			$box_title_container.find('img').attr('src', title_img);
-		} else {
-			$box_title_container.hide();
-		}
-		$box_title_container.find('.time').hide();
-
-		var legend = CONF_LEGENDNAME[name];
-		if (legend) {
-			$legend.show().find('img').attr('src', legend);
-		} else {
-			$legend.hide();
-		}
-	});
-	var $box_tool = $('.box_tool');
-	// 风场按钮
-	$box_tool.find('.tool_wind').click(Wind.show);
-	$box_tool.find('.tool_typhoon').click(function() {
-		Typhoon.init();
-	});
-	$box_tool.find('.tool_radar').click(function() {
-		Imgs.init('radar');
-	});
-	$box_tool.find('.tool_cloud').click(function() {
-		Imgs.init('cloud');
-	});
-
-	var $mask = $('#mask');
-	var paint_can_use = false;
-	var show_mask = true;
-	var $canvas_brush = $('#canvas_brush');
-	var $tool_brush = $box_tool.find('.tool_brush').click(function() {
-		$(this).toggleClass('on');
-		if (paint_can_use) {
-			Paint.clear();
-			$canvas_brush.hide();
-		} else {
-			$tool_hand.removeClass('on');
-			show_mask = true;
-			$canvas_brush.show();
-			$mask.show();
-			Paint.init($canvas_brush.get(0));
-		}
-
-		paint_can_use = !paint_can_use;
-	});
-	var $tool_hand = $box_tool.find('.tool_hand').click(function() {
-		if (show_mask) {
-			$mask.hide();
-		} else {
-			$mask.show();
-		}
-		$(this).toggleClass('on');
-		show_mask = !show_mask;
-		if (paint_can_use) {
-			$tool_brush.click();
-		}
-	});
-
-	! function() {
-		var win = window;
-		var resizeTT;
-		// 重置画布
-		function resizeBrush() {
-			clearTimeout(resizeTT);
-			resizeTT = setTimeout(function() {
-				$canvas_brush.attr('width', win.innerWidth).attr('height', win.innerHeight);
-				Wind.show();
-			}, 10);
-
-
-		}
-		$(win).bind('resize', resizeBrush);
-		resizeBrush();
-	}();
-	! function() {
-		var fn = function(e) {
-			Paint.preventDefault(e);
-		}
-		$mask.bind('touchstart', fn);
-		$mask.bind('touchmove', fn);
-		$mask.bind('touchend', fn);
-	}();
-	! function() {
-		if (is_native) {
-			var _win_current = nwDispatcher.requireNwGui().Window.get();
-			$('#btn_close').bind('click', function() {
-				_win_current.close();
-			});
-		}
-	}()
+	return;
 })
